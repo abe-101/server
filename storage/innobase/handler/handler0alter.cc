@@ -8727,7 +8727,7 @@ inline bool rollback_inplace_alter_table(Alter_inplace_info *ha_alter_info,
                                          const TABLE *table,
                                          row_prebuilt_t *prebuilt)
 {
-  bool fail= false;
+  bool fail= false, remove_index_stub= false;
   ha_innobase_inplace_ctx *ctx= static_cast<ha_innobase_inplace_ctx*>
     (ha_alter_info->handler_ctx);
 
@@ -8739,7 +8739,10 @@ inline bool rollback_inplace_alter_table(Alter_inplace_info *ha_alter_info,
     (almost) nothing has been or needs to be done. */
     dict_sys.lock(SRW_LOCK_CALL);
   else if (ctx->trx->state == TRX_STATE_NOT_STARTED)
+  {
+    remove_index_stub= true;
     goto free_and_exit;
+  }
   else if (ctx->new_table)
   {
     ut_ad(ctx->trx->state == TRX_STATE_ACTIVE);
@@ -8863,6 +8866,24 @@ free_and_exit:
 
     dict_sys.lock(SRW_LOCK_CALL);
 
+    if (remove_index_stub)
+    {
+      /* Drop index stubs from table cache that were created
+      as part of alter operation */
+      row_merge_drop_indexes(nullptr, ctx->old_table,
+                             ha_alter_info->alter_info->requested_lock ==
+                             Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE,
+                             nullptr);
+      if (!ctx->need_rebuild())
+      {
+        /* Assign the nullptr for clustered index online log */
+        dict_index_t *old_clust_index= ctx->old_table->indexes.start;
+        old_clust_index->lock.x_lock(SRW_LOCK_CALL);
+        old_clust_index->online_log= nullptr;
+        old_clust_index->lock.x_unlock();
+      }
+    }
+
     if (ctx->add_vcol)
     {
       for (ulint i = 0; i < ctx->num_to_add_vcol; i++)
@@ -8884,6 +8905,7 @@ free_and_exit:
     }
   }
 
+  DBUG_ASSERT(!prebuilt->table->indexes.start->online_log);
   DBUG_ASSERT(prebuilt->table->indexes.start->online_status ==
               ONLINE_INDEX_COMPLETE);
 

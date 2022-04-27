@@ -855,7 +855,9 @@ fts_drop_index(
 		mysql_mutex_unlock(&cache->init_lock);
 	}
 
-	err = fts_drop_index_tables(trx, *index);
+	if (trx) {
+		err = fts_drop_index_tables(trx, *index);
+	}
 
 	ib_vector_remove(indexes, (const void*) index);
 
@@ -1727,6 +1729,10 @@ fts_drop_all_index_tables(
 @return DB_SUCCESS or error code */
 dberr_t fts_drop_tables(trx_t *trx, const dict_table_t &table)
 {
+	if (!trx) {
+		return DB_SUCCESS;
+	}
+
 	dberr_t		error;
 	fts_table_t	fts_table;
 

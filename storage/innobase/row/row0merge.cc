@@ -3677,6 +3677,10 @@ row_merge_drop_index_dict(
 	trx_t*		trx,	/*!< in/out: dictionary transaction */
 	index_id_t	index_id)/*!< in: index identifier */
 {
+	if (!trx) {
+		return;
+	}
+
 	static const char sql[] =
 		"PROCEDURE DROP_INDEX_PROC () IS\n"
 		"BEGIN\n"
@@ -3720,6 +3724,10 @@ row_merge_drop_indexes_dict(
 	trx_t*		trx,	/*!< in/out: dictionary transaction */
 	table_id_t	table_id)/*!< in: table identifier */
 {
+	if (!trx) {
+		return;
+	}
+
 	static const char sql[] =
 		"PROCEDURE DROP_INDEXES_PROC () IS\n"
 		"ixid CHAR;\n"
@@ -3823,8 +3831,8 @@ row_merge_drop_indexes(
 	dict_index_t*	next_index;
 
 	ut_ad(!srv_read_only_mode);
-	ut_ad(trx->dict_operation_lock_mode);
-	ut_ad(trx->dict_operation);
+	ut_ad(!trx || trx->dict_operation_lock_mode);
+	ut_ad(!trx || trx->dict_operation);
 	ut_ad(dict_sys.locked());
 
 	index = dict_table_get_first_index(table);
@@ -3930,9 +3938,9 @@ row_merge_drop_indexes(
 	/* Invalidate all row_prebuilt_t::ins_graph that are referring
 	to this table. That is, force row_get_prebuilt_insert_row() to
 	rebuild prebuilt->ins_node->entry_list). */
-	if (table->def_trx_id < trx->id) {
+	if (trx && table->def_trx_id < trx->id) {
 		table->def_trx_id = trx->id;
-	} else {
+	} else if (trx) {
 		ut_ad(table->def_trx_id == trx->id || table->name.part());
 	}
 
