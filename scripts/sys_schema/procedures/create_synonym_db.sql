@@ -97,6 +97,7 @@ BEGIN
     DECLARE v_db_err_msg TEXT;
     DECLARE v_table VARCHAR(64);
     DECLARE v_views_created INT DEFAULT 0;
+    DECLARE v_table_exists ENUM('', 'BASE TABLE', 'VIEW', 'TEMPORARY') DEFAULT '';
 
     DECLARE db_doesnt_exist CONDITION FOR SQLSTATE '42000';
     DECLARE db_name_exists CONDITION FOR SQLSTATE 'HY000';
@@ -143,22 +144,25 @@ BEGIN
         IF v_done THEN
             LEAVE c_table_names;
         END IF;
+    -- Check the table type, don't support temporary since cannot create the view
+        CALL sys.table_exists(in_db_name, v_table, v_table_exists);
+        IF (v_table_exists <> 'TEMPORARY') THEN
+            SET @create_view_stmt = CONCAT(
+                'CREATE SQL SECURITY INVOKER VIEW ',
+                sys.quote_identifier(in_synonym),
+                '.',
+                sys.quote_identifier(v_table),
+                ' AS SELECT * FROM ',
+                sys.quote_identifier(in_db_name),
+                '.',
+                sys.quote_identifier(v_table)
+            );
+            PREPARE create_view_stmt FROM @create_view_stmt;
+            EXECUTE create_view_stmt;
+            DEALLOCATE PREPARE create_view_stmt;
 
-        SET @create_view_stmt = CONCAT(
-            'CREATE SQL SECURITY INVOKER VIEW ',
-            sys.quote_identifier(in_synonym),
-            '.',
-            sys.quote_identifier(v_table),
-            ' AS SELECT * FROM ',
-            sys.quote_identifier(in_db_name),
-            '.',
-            sys.quote_identifier(v_table)
-        );
-        PREPARE create_view_stmt FROM @create_view_stmt;
-        EXECUTE create_view_stmt;
-        DEALLOCATE PREPARE create_view_stmt;
-
-        SET v_views_created = v_views_created + 1;
+            SET v_views_created = v_views_created + 1;
+        END IF;
     END LOOP;
     CLOSE c_table_names;
 

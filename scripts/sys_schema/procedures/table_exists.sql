@@ -114,14 +114,17 @@ BEGIN
     DECLARE CONTINUE HANDLER FOR 1050 SET v_error = TRUE;
     DECLARE CONTINUE HANDLER FOR 1146 SET v_error = TRUE;
 
-    SET out_exists = (SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = in_db AND TABLE_NAME = in_table AND TABLE_TYPE= 'temporary');
+    SET out_exists = (SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = in_db AND TABLE_NAME = in_table AND TEMPORARY= 'Y');
+    -- It is not an temporary table/sequence
     IF out_exists is NULL
     THEN
-        SET out_exists = (SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = in_db AND TABLE_NAME = in_table);
-       IF out_exists is NULL
-       THEN
-           SET out_exists='';
-       END IF;
+      SET out_exists = (SELECT TABLE_TYPE FROM information_schema.TABLES WHERE TABLE_SCHEMA = in_db AND TABLE_NAME = in_table);
+      IF out_exists is NULL
+      THEN
+          SET out_exists='';
+      END IF;
+    ELSE
+      SET out_exists = 'TEMPORARY';
     END IF;
 END$$
 

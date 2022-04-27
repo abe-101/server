@@ -50,3 +50,16 @@ DROP TABLE test.t1;
 DROP TABLE test.t2;
 DROP TABLE `is`;
 DROP TABLE `ab``c`;
+#
+# MDEV-28343: sys.create_synonym_db doesn't work
+#             when schema contains temporary tables
+#
+create database mytestdb;
+use mytestdb;
+create table t (b int);
+create temporary table tmp (a int);
+call sys.create_synonym_db('mytestdb','db_syn1');
+summary
+Created 1 view in the `db_syn1` database
+drop database mytestdb;
+drop database db_syn1;
